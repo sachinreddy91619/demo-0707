@@ -1,0 +1,329 @@
+
+
+..> In Joi validation, you can chain multiple methods together to define a schema. When you're using .pattern() to validate a string against a regular expression and .required() to ensure the field is not empty, the order in which you chain them doesn’t matter in terms of functionality, but it's more about readability and consistency.
+
+
+..> Implicit Regular Expression: The .email() method internally checks for a valid email format, which is often based on a general email pattern (e.g., user@example.com).
+Built-in Logic: The Joi library has its own regular expression for email validation. So, when you use .email(), you don't need to manually write the regex for validating emails.
+
+...> To enforce that a field only contains either "admin" or "user" using Joi, you can use the .valid() method to specify the allowed values.
+
+ex : 
+const joi = require('joi');
+
+const schema = joi.object({
+  role: joi.string().valid('admin', 'user').required()  // Ensures role is either 'admin' or 'user'
+});
+
+const result1 = schema.validate({ role: 'admin' });
+console.log(result1.error);  // null, valid role
+
+const result2 = schema.validate({ role: 'guest' });
+console.log(result2.error);  // Error: "role" must be one of [admin, user]
+
+...> 
+
+
+
+whem we use the  middlewares, for the authentication and for authorization then we nned to us the code has:
+fastify.post('/create', { 
+  schema: createEventSchema, 
+  preHandler: async (request, reply) => {
+    // First, call the auth middleware
+    await auth(request, reply);
+    
+    // Then, check role authorization for 'admin'
+    await roleauth(['admin'])(request, reply);
+
+    // Validate the request body
+    const { error } = EMcreateEventValidation.validate(request.body);
+    if (error) {
+      return reply.status(400).send({
+        error: 'Bad Request',
+        message: error.details[0].message,
+      });
+    }
+  }
+}, createEvent);
+
+
+
+
+============================================================================================================================================================>
+
+
+
+
+why to use the await in the preHandler code :
+
+Why use await in auth and roleauth?
+Authentication (auth(request, reply)):
+
+auth is likely a middleware or a function that checks whether the user is authenticated, either through a session, a token (JWT), or some other method.
+The await is used because authentication might involve an asynchronous operation (like querying a database or validating a JWT token). If we didn't await it, the rest of the code would execute before authentication completes, potentially allowing an unauthenticated user to proceed.
+Role Authorization (roleauth(['admin'])(request, reply)):
+
+Similarly, roleauth is a middleware that checks whether the authenticated user has a specific role (e.g., admin).
+The await ensures that this check completes before moving on. If the user is not authorized, they won’t get to the validation step (or any other part of the request processing).
+What is exactly happening in await auth(request, reply) and await roleauth(['admin'])(request, reply)?
+await auth(request, reply):
+
+This middleware runs some logic to authenticate the user (e.g., by checking for a valid JWT or an authentication cookie). If the user is not authenticated, it will typically send a response like 401 Unauthorized, and the request will stop there.
+await roleauth(['admin'])(request, reply):
+
+After the user is authenticated, this middleware checks if the user has the admin role.
+The role is often checked based on the user's session or a token (e.g., by checking a role in a decoded JWT or querying a database for the user's roles).
+If the user does not have the admin role, this middleware will typically send a response like 403 Forbidden, and the request will stop.
+
+
+============================================================================================================================================================>
+why we are using the await and (request,reply) , 
+
+The request and reply parameters in Fastify are part of the standard request-response cycle for handling HTTP requests. They are objects that provide the necessary methods and data for interacting with HTTP requests and responses. Here's a detailed explanation:
+
+1. request:
+Definition: The request object represents the incoming HTTP request. It contains details about the request, such as:
+
+URL: The URL of the incoming request.
+Headers: HTTP headers sent by the client.
+Body: The data sent in the body of a POST or PUT request (e.g., JSON, form data).
+Query Params: The query parameters in the URL (e.g., ?id=1).
+Params: Path parameters defined in the route (e.g., /users/:id).
+Usage: You use the request object to access any of this data. For example, request.body is where the data sent in a POST request will be, and request.headers would contain the headers sent by the client.
+
+2. reply:
+Definition: The reply object is used to send an HTTP response back to the client. It provides methods for setting the status code, sending a JSON response, or redirecting the user.
+
+reply.status(code): Sets the HTTP status code for the response.
+reply.send(payload): Sends a response with the specified payload (can be an object, string, or other).
+reply.header(name, value): Sets a specific HTTP header in the response.
+Usage: You use the reply object to send an HTTP response. For example, reply.send() is used to send back a response body, and reply.status(400) is used to set a bad request status.
+
+In the context of await auth(request, reply):
+auth(request, reply): This is a function (or middleware) that typically checks if the incoming request has a valid authentication token (such as a JWT or session cookie).
+request: Is used by the auth function to access the data in the incoming request, such as checking headers for an Authorization token or validating the body.
+reply: Is used to send a response if the authentication fails, for example, by sending a 401 Unauthorized status code with an error message.
+
+============================================================================================================================================================>
+
+
+different ways to use the , authentication and authorization :
+
+
+
+1. Using Fastify Hooks (Global Pre-handlers)
+You could register a global preHandler hook in Fastify to handle authentication and authorization for all routes. This way, you don't need to explicitly call auth(request, reply) and roleauth(request, reply) in every individual route. Instead, they will run globally for all incoming requests.
+
+javascript
+Copy
+fastify.addHook('preHandler', async (request, reply) => {
+  await auth(request, reply); // Check if the user is authenticated
+  await roleauth(['admin'])(request, reply); // Check if the user has the 'admin' role
+});
+This method would apply the auth and roleauth checks to all routes automatically, so you don't need to repeat the code for each route. If a user isn't authenticated or authorized, they’ll be blocked early in the request cycle.
+
+2. Fastify Plugins (Encapsulation)
+If you want to encapsulate the authentication and authorization logic for specific routes or groups of routes, you can create a Fastify plugin. A plugin allows you to define shared logic that can be reused across different parts of your application.
+
+javascript
+Copy
+async function authPlugin(fastify, options) {
+  fastify.decorate('authenticate', async (request, reply) => {
+    await auth(request, reply);
+    await roleauth(['admin'])(request, reply);
+  });
+}
+
+// Register the plugin
+fastify.register(authPlugin);
+
+// Use it in your routes
+fastify.post('/create', { 
+  schema: createEventSchema,
+  preHandler: fastify.authenticate
+}, createEvent);
+In this case, the authenticate function is encapsulated in a plugin and then used in any route where you need it, without needing to repeat the logic.
+
+3. Using Fastify's Built-in Hooks for Route-Specific Logic
+Another way to handle things in a more isolated manner is to use route-specific hooks. For instance, you can use the onRequest or preHandler hooks for a single route to handle authentication and authorization:
+
+javascript
+Copy
+fastify.post('/create', {
+  schema: createEventSchema,
+  preHandler: async (request, reply) => {
+    await fastify.authenticate(request, reply); // Can call from plugin or directly
+  }
+}, createEvent);
+In this approach:
+
+preHandler is used specifically for this route to ensure the user is authenticated and authorized.
+You can encapsulate the logic in a helper method or use a global hook, as needed.
+Custom Authorization Middleware
+If you prefer to write your own middleware to handle authorization or authentication checks, you could define your own logic in a middleware function. This can be useful if you need more control over the flow or want to work with external services or databases.
+
+javascript
+Copy
+function auth(request, reply) {
+  return new Promise((resolve, reject) => {
+    // Custom logic to check if the user is authenticated
+    if (!request.headers['authorization']) {
+      return reply.status(401).send({ error: 'Unauthorized' });
+    }
+    resolve();
+  });
+}
+This can be used in your route or preHandler directly.
+
+Which Approach to Choose?
+Global Hook (preHandler): Useful if you want to ensure authentication and authorization is checked for every request across your application. This saves you from repeating the logic in every route.
+
+Plugin Approach: Ideal if you want modular, reusable logic. You can encapsulate authentication/authorization in plugins and apply them wherever needed in the app.
+
+Route-Specific Hooks (preHandler): Good for handling authentication/authorization on a per-route basis while keeping the logic specific to that route.
+
+Summary:
+request: Contains data about the incoming request (headers, body, etc.).
+reply: Used to send a response back to the client.
+auth(request, reply) is used to authenticate the user, often involving checking headers or cookies.
+roleauth(['admin'])(request, reply) checks the user’s role and can deny access if the role doesn’t match.
+Alternative methods to handle authentication and authorization include using global hooks, plugins, or route-specific hooks.
+
+============================================================================================================================================================>
+ fastify.post('/logout', { preHandler: async(request,reply)=>{
+            const {error}=userLogoutValidation.validate(request.headers);
+            if(error){
+                return reply.status(400).send({
+    
+                    error:'Bad Request',
+                    message:'The authorization header is required',
+                    });
+            }
+
+            await auth(request,reply);
+        }
+        },logout); // logout route
+}
+
+==================
+
+fastify.get('/get', { preHandler: async(request,reply)=>{
+
+    const {error}=EMgetEventsValidation.validate(request.headers);
+    if(error){
+      return reply.status(400).send({
+          error:'Bad Request',
+          message:'The authorization header is required, to get the events of the particular event manager',
+          //message:error.details[0].message,
+      })
+    }
+    
+    await auth(request,reply)
+  }
+  
+  }, getevent);
+
+
+
+
+===================================================================================================================================
+
+ADDDING THE TWO OR MORE VALIDATIONS, IN SAME JOI SCHEMA 
+
+import fastify from 'fastify';
+import Joi from 'joi';
+
+const app = fastify({
+  logger: true
+});
+
+
+const EMgetbyidEventsValidation = Joi.object({
+  
+  authorization: Joi.string()
+    .pattern(/^Bearer [A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+$/, 'JWT Token')
+    .required(),
+  
+  id: Joi.string()
+    .pattern(/^[0-9a-fA-F]{24}$/, 'ObjectId') 
+    .required()
+});
+
+export default EMgetbyidEventsValidation;
+
+// Fastify route with the validation logic
+app.get('/get/:id', {
+  schema: {
+    params: {
+      type: 'object',
+      required: ['id'],
+      properties: {
+        id: { type: 'string', pattern: '^[0-9a-fA-F]{24}$' } // MongoDB ObjectId validation
+      }
+    }
+  },
+  preHandler: async (request, reply) => {
+   
+    const { error } = EMgetbyidEventsValidation.validate({
+      authorization: request.headers['authorization'], // Accessing the header value
+      id: request.params.id // Accessing the id parameter from the URL
+    });
+
+    if (error) {
+      return reply.status(400).send({
+        error: 'Bad Request',
+        message: 'The Authorization header and/or the id parameter are not valid.'
+      });
+    }
+
+    // Proceed with auth and other operations if validation passes
+    await auth(request, reply);
+  }
+}, async (request, reply) => {
+  // Your route handler logic here
+  const { id } = request.params;
+  // Fetch event by id logic here
+  return reply.send({ message: `Event with ID: ${id}` });
+});
+
+
+
+
+===================================================================================================================================
+
+fastify.post('/register', { schema: registerUserSchema ,preHandler:
+
+        async(request ,reply)=>{
+            const {error}=userRegisterValidation.validate(request.body);
+
+            
+        }
+    }, register); 
+
+
+
+
+const userRegisterValidation=joi.object({
+
+    username:joi.string().alphanum().min(3).max(15).required(),
+
+    email:joi.string().email().required(),
+
+   
+
+    role:joi.string().valid('user', 'admin').required()
+
+}) ;
+
+export default userRegisterValidation
+
+
+
+
+67a45448c435f5c8147623f0
+
+
+
+
+
+
