@@ -146,6 +146,8 @@ export const getbyid = async (request, reply) => {
 
 // This is the route for updating an event
 export const updateevent = async (request, reply) => {
+
+    console.log("hai iam SACHIN HERE ! WHAT ABOUT YOU")
     const { eventname, eventdate, eventlocation, amountrange, eventtime } = request.body;
 
 

@@ -35,7 +35,10 @@ export default async (request, reply) => {
         }
 
         // Attach the user info to the request object for further use in route handlers
+
+        console.log("HAIHAIHAIHAHAIHAIHAIHAIHAIHAIHAIHAIHAIHAIHAI")
         request.user = decoded;
+        
 
         // Continue with the request processing
 

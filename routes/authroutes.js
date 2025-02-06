@@ -63,8 +63,16 @@ async function authroutes(fastify, options) {
     //     }
     // },logout); // logout route
 
-    fastify.post('/logout', { preHandler: async(request,reply)=>{
-            const {error}=userLogoutValidation.validate(request.headers);
+    fastify.post('/logout', { preHandler: async (request,reply)=>{
+           // const {error}=userLogoutValidation.validate(request.headers);
+
+           const {error}=userLogoutValidation.validate({
+            authorization: request.headers['authorization'], // Accessing the header value
+          });
+
+
+
+
             if(error){
                 return reply.status(400).send({
     

@@ -8,7 +8,7 @@ const app = fastify({
 const createUserSchema = {
     body: {
         type: 'object',
-        required: ['eventname', 'eventdate', 'eventlocation', 'amountrange', 'eventtime'],
+      //  required: ['eventname', 'eventdate', 'eventlocation', 'amountrange', 'eventtime'],
         properties: {
             eventname: { type: 'string' },
             eventdate: { type: 'string', format: 'date' },
