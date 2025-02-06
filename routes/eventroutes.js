@@ -14,7 +14,9 @@ import roleauth from '../middleware/roleauth.js';
 
 import joi from 'joi';
 
-import {UlocValidation} from '../validators/Uloc.js'
+import { UlocValidation } from '../validators/Uloc.js'
+
+
 
 import EMcreateEventValidation from '../validators/EMcreateEvent.js';
 
@@ -26,6 +28,9 @@ import EMgetbyidEventsValidation from '../validators/EMgetbyidEvent.js';
 
 import { UeventbookValidation } from '../validators/Ueventbook.js';
 
+import UgetAll from '../validators/Ugetall.js';
+
+import { UeventbookEditValidation } from '../validators/Uupdate.js';
 
 import EMupdateValidation from '../validators/EMupdateValidation.js';
 
@@ -36,28 +41,29 @@ async function eventRoutes(fastify, options) {
 
   // this route is to create the create the event 
 
- // fastify.post('/create', { schema: createEventSchema, preHandler: [auth, roleauth(['admin'])] }, createEvent);
+  // fastify.post('/create', { schema: createEventSchema, preHandler: [auth, roleauth(['admin'])] }, createEvent);
 
- fastify.post('/create', { schema: createEventSchema, preHandler: async(request,reply)=>{
+  fastify.post('/create', {
+    schema: createEventSchema, preHandler: async (request, reply) => {
 
-  const {error}=EMcreateEventValidation.validate(request.body);
-  if(error){
-    return reply.status(400).send({
-        error:'Bad Request',
-        message:error.details[0].message,
-    })
-  }
- 
-  
-  
-  //roleauth(['admin']
-await auth(request,reply)
+      const { error } = EMcreateEventValidation.validate(request.body);
+      if (error) {
+        return reply.status(400).send({
+          error: 'Bad Request',
+          message: error.details[0].message,
+        })
+      }
 
-await roleauth(['admin'])(request,reply)
 
- }
 
-}, createEvent);
+      //roleauth(['admin']
+      await auth(request, reply)
+
+      await roleauth(['admin'])(request, reply)
+
+    }
+
+  }, createEvent);
 
 
 
@@ -79,43 +85,46 @@ await roleauth(['admin'])(request,reply)
   // This route is to get all  the  events of the particular event manager
   //fastify.get('/get', { preHandler: auth }, getevent);
 
-  fastify.get('/get', { preHandler: async (request,reply)=>{
+  fastify.get('/get', {
+    preHandler: async (request, reply) => {
 
-    const {error}=EMgetEventsValidation.validate({
-      authorization: request.headers['authorization'], // Accessing the header value
-    });
-
-    if(error){
-      return reply.status(400).send({
-          error:'Bad Request',
-          message:'The authorization header is required, to get the events of the particular event manager',
-          //message:error.details[0].message,
+      const { error } = EMgetEventsValidation.validate({
+        authorization: request.headers['authorization'], // Accessing the header value
       });
+
+      if (error) {
+        return reply.status(400).send({
+          error: 'Bad Request',
+          message: 'The authorization header is required, to get the events of the particular event manager',
+          //message:error.details[0].message,
+        });
+      }
+
+      await auth(request, reply);
     }
-    
-    await auth(request,reply);
-  }
-  
+
   }, getevent);
 
 
 
   // This route is to get a particular event based on Id
-  fastify.get('/get/:id', { schema: getbyidEventSchema, preHandler: async(request,reply)=>{
+  fastify.get('/get/:id', {
+    schema: getbyidEventSchema, preHandler: async (request, reply) => {
 
-  const {error}=EMgetbyidEventsValidation.validate({
-    authorization: request.headers['authorization'], // Accessing the header value
-  });
+      const { error } = EMgetbyidEventsValidation.validate({
+        authorization: request.headers['authorization'], // Accessing the header value
+      });
 
-  if(error){
-    return reply.status(400).send({
-      error:'Bad Request',
-      message:'The authorization header is required, to get the events of the particular event manager based on the id',
-    })
-  }
-    
-    await auth(request,reply)}
-  
+      if (error) {
+        return reply.status(400).send({
+          error: 'Bad Request',
+          message: 'The authorization header is required, to get the events of the particular event manager based on the id',
+        })
+      }
+
+      await auth(request, reply)
+    }
+
   }, getbyid);
 
 
@@ -136,7 +145,7 @@ await roleauth(['admin'])(request,reply)
 
 
 
-  fastify.put('/update/:id', {  preHandler: [auth, roleauth(['admin'])] }, updateevent);
+  fastify.put('/update/:id', { preHandler: [auth, roleauth(['admin'])] }, updateevent);
 
   // This route is to update the event 
   // fastify.put('/update/:id', { preHandler: async(request,reply)=>{
@@ -160,12 +169,12 @@ await roleauth(['admin'])(request,reply)
   //       message:'The authorization header is required, to update the events of the particular event manager'
   //     })
 
-      
+
 
   //   }
 
   //   const {error:paramsIdError}=EMupdateValidation.validate({
-      
+
   //     id:request.params.id
   //   })
 
@@ -188,13 +197,13 @@ await roleauth(['admin'])(request,reply)
   //     })
 
   //   }
-  
-    
-    
-    
+
+
+
+
   //    await auth(request,reply), 
   //    await roleauth(['admin'])(request,reply) }
-    
+
   //   }, updateevent);
 
 
@@ -209,152 +218,86 @@ await roleauth(['admin'])(request,reply)
   // ROUTES FOR THE USER 
 
   // this is the provide the location
-  fastify.post('/location', { preHandler: 
+  fastify.post('/location', {
+    preHandler:
 
-   
-    async(request,reply)=>{
-      await auth(request,reply) 
-console.log("user authenticated for giveing the location and GOing to NEXT ")
 
-      const {error:authError}=UlocValidation.authorizationValidation.validate({
-        authorization: request.headers['authorization'], // Accessing the header value
-      });
+      async (request, reply) => {
+        await auth(request, reply)
+        console.log("user authenticated for giveing the location and GOing to NEXT ")
 
-      if(authError){
+        const { error: authError } = UlocValidation.authorizationValidation.validate({
+          authorization: request.headers['authorization'], // Accessing the header value
+        });
 
-        return reply.status(400).send({
-          error:'Bad Request',
-          message:'The authorization header is required, to provide the location of the user'
-      })
+        if (authError) {
 
-    }
+          return reply.status(400).send({
+            error: 'Bad Request',
+            message: 'The authorization header is required, to provide the location of the user'
+          })
 
-    const {error:bodyError}=UlocValidation.userLocationValidation.validate(request.body);
+        }
 
-    if(bodyError){
+        const { error: bodyError } = UlocValidation.userLocationValidation.validate(request.body);
 
-      return reply.status(400).send({
-        error:'Bad Request',
-        message:'The body is not matching has per  requirements, to provide the location of the user'
-      })
+        if (bodyError) {
 
-    }
-    
-  
-    
-    
-  
-}}, loc);
+          return reply.status(400).send({
+            error: 'Bad Request',
+            message: 'The body is not matching has per  requirements, to provide the location of the user'
+          })
 
+        }
 
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+      }
+  }, loc);
 
 
 
 
 
   // this route is book the event
-  fastify.post('/eventit/:id', { preHandler:
-    async(request,reply)=>{
-      await auth(request,reply)
-    } 
-    
-    
-    
-     }, eventbook);
+  fastify.post('/eventit/:id', {
+    preHandler:
+      async (request, reply) => {
+
+        const { error: authError } = UeventbookValidation.authorizationValidation.validate({
+
+          authorization: request.headers['authorization'], // Accessing the header value
+
+        })
+
+        if (authError) {
+
+          return reply.status(400).send({
+            error: 'Bad Request',
+            message: 'The authorization header is required, while booking the no of seats for the event'
+          })
+        }
+
+        const { error: NoSeatsError } = UeventbookValidation.userNoOfSeatsValidation.validate(request.body)
+
+        if (NoSeatsError) {
+
+          return reply.status(400).send({
+
+            error: 'BAD Request',
+            message: 'The  body is missing the required format'
+
+          })
+        }
+
+        await auth(request, reply)
+      }
+
+
+
+  }, eventbook);
 
 
 
@@ -376,10 +319,101 @@ console.log("user authenticated for giveing the location and GOing to NEXT ")
 
 
   // this is is to get all  the bookings of the user 
-  fastify.get('/all', { preHandler: auth }, getallbookings);
+  fastify.get('/all', {
+    preHandler: async (request, reply) => {
+
+      const { error } = UgetAll.validate({
+
+        authorization: request.headers['authorization'], // Accessing the header value
+
+      })
+
+      if (error) {
+
+
+        return reply.status(400).send({
+          error: 'Bad Request',
+          message: 'The authorization header is required, to all of the bookings '
+        })
+
+
+
+
+      }
+
+
+
+      await auth(request, reply);
+    }
+
+
+
+
+  }, getallbookings);
+
+
+
 
   // this route is to update the update a booking 
-  fastify.put('/bookings/:id', { preHandler: auth }, booking);
+  fastify.put('/bookings/:id', {
+    preHandler:
+
+
+      async (request, reply) => {
+
+
+
+        const { error: authError } = UeventbookEditValidation.authorizationValidation.validate({
+
+          authorization: request.headers['authorization'], // Accessing the header value
+
+        })
+
+        if (authError) {
+
+          return reply.status(400).send({
+            error: 'Bad Request',
+            message: 'The authorization header is required, while booking the no of seats for the event'
+          })
+        }
+
+
+        const { error: UserUpdationError } = UeventbookEditValidation.userNoOfSeatsEditValidation.validate(request.body)
+
+        if (UserUpdationError) {
+
+          return reply.status(400).send({
+            error: 'Bad Request',
+            message: 'The Body is not Matching has per the requirements, give correct body for updation'
+          })
+        }
+
+
+        const { error: UserparamsgivenError } = UeventbookEditValidation.usergivenparams.validate(request.params)
+
+
+        if (UserparamsgivenError) {
+
+          return reply.status(400).send({
+            error: 'Bad Request',
+            message: 'The params is not Matching has per the requirements, give correct params id for updation'
+          })
+
+        }
+
+
+
+
+
+
+
+
+        await auth(request, reply);
+      }
+
+
+  }, booking);
+
 
   // this route is to delete the booking
   fastify.delete('/cc/:id', { preHandler: auth }, eventdelete);

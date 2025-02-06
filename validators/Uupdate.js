@@ -21,16 +21,26 @@ const authorizationValidation = joi.object({
 
 })
 
-const userNoOfSeatsValidation = joi.object({
+const userNoOfSeatsEditValidation = joi.object({
 
-    NoOfSeatsBooking: joi.number().min(1).required(),
+    NoOfSeatsBooking: joi.number().min(1).required().strict(),
 
 })
 
+const usergivenparams = joi.object({
 
-export const UeventbookValidation = {
+
+
+    id: joi.string()
+        .pattern(/^[0-9a-fA-F]{24}$/, 'MongoDB ObjectId')  // Regex for 24-character hex string
+        .required()
+
+})
+
+export const UeventbookEditValidation = {
 
     authorizationValidation,
-    userNoOfSeatsValidation
+    userNoOfSeatsEditValidation,
+    usergivenparams
 
 };
