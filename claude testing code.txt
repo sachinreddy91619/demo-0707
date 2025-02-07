@@ -1,0 +1,492 @@
+import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globals';
+import { build } from './helper';
+import mongoose from 'mongoose';
+import { User } from '../models/User';  // Assuming this is your User model path
+
+describe('Registration Endpoint Tests', () => {
+  let app;
+
+  beforeEach(async () => {
+    app = await build();
+    await User.deleteMany({}); // Clean up the test database
+  });
+
+  afterEach(async () => {
+    await mongoose.connection.close();
+  });
+
+  // Test valid registration
+  test('should successfully register a new user', async () => {
+    const payload = {
+      username: 'testuser',
+      email: 'test@example.com',
+      password: 'TestPassword123',
+      role: 'user'
+    };
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/auth/register',
+      payload
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(JSON.parse(response.payload)).toEqual({
+      message: 'user created successfully'
+    });
+
+    // Verify user was actually saved in database
+    const savedUser = await User.findOne({ username: 'testuser' });
+    expect(savedUser).toBeTruthy();
+    expect(savedUser.email).toBe(payload.email);
+  });
+
+  // Test duplicate username
+  test('should fail when username already exists', async () => {
+    const user = new User({
+      username: 'existinguser',
+      email: 'existing@example.com',
+      password: 'ExistingPass123',
+      role: 'user'
+    });
+    await user.save();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/auth/register',
+      payload: {
+        username: 'existinguser',
+        email: 'new@example.com',
+        password: 'NewPassword123',
+        role: 'user'
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(JSON.parse(response.payload)).toHaveProperty('error', 'Username already exists. Try with another username');
+  });
+
+  // Test validation errors
+  describe('Input Validation', () => {
+    test('should fail when username is too short', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/auth/register',
+        payload: {
+          username: 'ab',  // Less than min length of 3
+          email: 'test@example.com',
+          password: 'TestPassword123',
+          role: 'user'
+        }
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(JSON.parse(response.payload)).toHaveProperty('error', 'Bad Request');
+    });
+
+    test('should fail when email is invalid', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/auth/register',
+        payload: {
+          username: 'testuser',
+          email: 'invalid-email',
+          password: 'TestPassword123',
+          role: 'user'
+        }
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(JSON.parse(response.payload)).toHaveProperty('error', 'Bad Request');
+    });
+
+    test('should fail when password format is invalid', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/auth/register',
+        payload: {
+          username: 'testuser',
+          email: 'test@example.com',
+          password: 'weak',  // Doesn't meet password requirements
+          role: 'user'
+        }
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(JSON.parse(response.payload)).toHaveProperty('error', 'Bad Request');
+    });
+
+    test('should fail when role is invalid', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/auth/register',
+        payload: {
+          username: 'testuser',
+          email: 'test@example.com',
+          password: 'TestPassword123',
+          role: 'superuser'  // Invalid role
+        }
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(JSON.parse(response.payload)).toHaveProperty('error', 'Bad Request');
+    });
+  });
+
+  // Test missing fields
+  test('should fail when required fields are missing', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/auth/register',
+      payload: {
+        username: 'testuser',
+        email: 'test@example.com'
+        // Missing password and role
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  // Test server error handling
+  test('should handle server errors gracefully', async () => {
+    // Mock User.findOne to simulate a database error
+    jest.spyOn(User, 'findOne').mockImplementationOnce(() => {
+      throw new Error('Database connection failed');
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/auth/register',
+      payload: {
+        username: 'testuser',
+        email: 'test@example.com',
+        password: 'TestPassword123',
+        role: 'user'
+      }
+    });
+
+    expect(response.statusCode).toBe(500);
+    expect(JSON.parse(response.payload)).toHaveProperty('error', 'error creating the user');
+  });
+});
+
+==================================================================================>
+
+
+SECOND APPROACH IS:
+=====================>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globals';
+import { register } from '../controllers/authController';  // Adjust path as needed
+
+// Mock the entire User model
+jest.mock('../models/User', () => ({
+    User: {
+        findOne: jest.fn(),
+        prototype: {
+            save: jest.fn(),
+        }
+    }
+}));
+
+// Import the mocked User model
+import { User } from '../models/User';
+
+describe('Registration Controller Tests with Mocks', () => {
+    // Clear all mocks before each test
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
+
+    // Test successful registration
+    test('should successfully register a new user', async () => {
+        // Mock findOne to return null (no existing user)
+        User.findOne.mockResolvedValueOnce(null);
+        
+        // Mock save method
+        User.prototype.save.mockResolvedValueOnce({
+            username: 'testuser',
+            email: 'test@example.com',
+            role: 'user'
+        });
+
+        const mockRequest = {
+            body: {
+                username: 'testuser',
+                email: 'test@example.com',
+                password: 'TestPassword123',
+                role: 'user'
+            }
+        };
+
+        const mockReply = {
+            status: jest.fn().mockReturnThis(),
+            send: jest.fn()
+        };
+
+        await register(mockRequest, mockReply);
+
+        // Verify findOne was called with correct username
+        expect(User.findOne).toHaveBeenCalledWith({ username: 'testuser' });
+        
+        // Verify save was called
+        expect(User.prototype.save).toHaveBeenCalled();
+        
+        // Verify response
+        expect(mockReply.status).toHaveBeenCalledWith(201);
+        expect(mockReply.send).toHaveBeenCalledWith({
+            message: 'user created successfully'
+        });
+    });
+
+    // Test duplicate username
+    test('should fail when username already exists', async () => {
+        // Mock findOne to return an existing user
+        User.findOne.mockResolvedValueOnce({
+            username: 'existinguser',
+            email: 'existing@example.com'
+        });
+
+        const mockRequest = {
+            body: {
+                username: 'existinguser',
+                email: 'new@example.com',
+                password: 'NewPassword123',
+                role: 'user'
+            }
+        };
+
+        const mockReply = {
+            status: jest.fn().mockReturnThis(),
+            send: jest.fn()
+        };
+
+        await register(mockRequest, mockReply);
+
+        expect(User.findOne).toHaveBeenCalledWith({ username: 'existinguser' });
+        expect(mockReply.status).toHaveBeenCalledWith(400);
+        expect(mockReply.send).toHaveBeenCalledWith({
+            error: 'Username already exists. Try with another username'
+        });
+    });
+
+    // Test missing required fields
+    test('should fail when required fields are missing', async () => {
+        const mockRequest = {
+            body: {
+                username: 'testuser',
+                // missing email, password, and role
+            }
+        };
+
+        const mockReply = {
+            status: jest.fn().mockReturnThis(),
+            send: jest.fn()
+        };
+
+        await register(mockRequest, mockReply);
+
+        // Verify findOne was not called
+        expect(User.findOne).not.toHaveBeenCalled();
+        expect(mockReply.status).toHaveBeenCalledWith(400);
+    });
+
+    // Test database error during findOne
+    test('should handle database error during user check', async () => {
+        // Mock findOne to throw an error
+        User.findOne.mockRejectedValueOnce(new Error('Database error'));
+
+        const mockRequest = {
+            body: {
+                username: 'testuser',
+                email: 'test@example.com',
+                password: 'TestPassword123',
+                role: 'user'
+            }
+        };
+
+        const mockReply = {
+            status: jest.fn().mockReturnThis(),
+            send: jest.fn()
+        };
+
+        await register(mockRequest, mockReply);
+
+        expect(User.findOne).toHaveBeenCalledWith({ username: 'testuser' });
+        expect(mockReply.status).toHaveBeenCalledWith(500);
+        expect(mockReply.send).toHaveBeenCalledWith({
+            error: 'error creating the user'
+        });
+    });
+
+    // Test database error during save
+    test('should handle database error during save', async () => {
+        // Mock findOne to return null (no existing user)
+        User.findOne.mockResolvedValueOnce(null);
+        
+        // Mock save to throw error
+        User.prototype.save.mockRejectedValueOnce(new Error('Save failed'));
+
+        const mockRequest = {
+            body: {
+                username: 'testuser',
+                email: 'test@example.com',
+                password: 'TestPassword123',
+                role: 'user'
+            }
+        };
+
+        const mockReply = {
+            status: jest.fn().mockReturnThis(),
+            send: jest.fn()
+        };
+
+        await register(mockRequest, mockReply);
+
+        expect(User.findOne).toHaveBeenCalledWith({ username: 'testuser' });
+        expect(User.prototype.save).toHaveBeenCalled();
+        expect(mockReply.status).toHaveBeenCalledWith(500);
+        expect(mockReply.send).toHaveBeenCalledWith({
+            error: 'error creating the user'
+        });
+    });
+
+    // Test validation middleware simulation
+    test('should validate user input properly', async () => {
+        const mockRequest = {
+            body: {
+                username: 'te', // too short
+                email: 'invalid-email',
+                password: 'weak',
+                role: 'invalid-role'
+            }
+        };
+
+        const mockReply = {
+            status: jest.fn().mockReturnThis(),
+            send: jest.fn()
+        };
+
+        await register(mockRequest, mockReply);
+
+        // Verify findOne was not called due to validation failure
+        expect(User.findOne).not.toHaveBeenCalled();
+        expect(mockReply.status).toHaveBeenCalledWith(400);
+    });
+});
+
+=========================================================================================>
+
+THIRD APPROACH: CLAUDE :
+
+import fastify from 'fastify';
+import request from 'supertest';
+import mongoose from 'mongoose';
+import app from '../../app.js';
+
+// Mock the entire Users model, not just the save method
+jest.mock('../../models/Users.js', () => {
+    return {
+        findOne: jest.fn(),
+        prototype: {
+            save: jest.fn()
+        }
+    };
+});
+
+// Import the mocked model after mocking
+import Users from '../../models/Users.js';
+
+describe('POST /register', () => {
+    let server;
+
+    beforeAll(async () => {
+        server = await app.listen(0); // Use port 0 for random available port
+    });
+
+    afterAll(async () => {
+        await app.close();
+        await mongoose.connection.close();
+    });
+
+    beforeEach(() => {
+        jest.clearAllMocks(); // Clear all mocks before each test
+    });
+
+    it('should register a new user successfully with valid data', async () => {
+        // Mock findOne to return null (no existing user)
+        Users.findOne = jest.fn().mockResolvedValue(null);
+
+        // Mock the save method
+        Users.prototype.save = jest.fn().mockResolvedValue({
+            _id: 'mocked-user-id',
+            username: 'Testuser',
+            email: 'Testuser@gmail.com',
+            role: 'user'
+        });
+
+        const response = await request(app.server) // Use app.server for supertest
+            .post('/auth/register')
+            .send({
+                username: 'Testuser',
+                email: 'Testuser@gmail.com',
+                password: 'Password@123',
+                role: 'user'
+            });
+
+        expect(response.status).toBe(201);
+        expect(response.body.message).toBe('user created successfully');
+        expect(Users.findOne).toHaveBeenCalledWith({ username: 'Testuser' });
+        expect(Users.prototype.save).toHaveBeenCalled();
+    });
+
+    // Add test for duplicate username
+    it('should fail when username already exists', async () => {
+        // Mock findOne to return an existing user
+        Users.findOne = jest.fn().mockResolvedValue({
+            username: 'Testuser',
+            email: 'existing@gmail.com'
+        });
+
+        const response = await request(app.server)
+            .post('/auth/register')
+            .send({
+                username: 'Testuser',
+                email: 'Testuser@gmail.com',
+                password: 'Password@123',
+                role: 'user'
+            });
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toBe('Username already exists. Try with another username');
+    });
+
+    // Add test for invalid input
+    it('should fail with invalid input', async () => {
+        const response = await request(app.server)
+            .post('/auth/register')
+            .send({
+                username: 'te', // too short
+                email: 'invalid-email',
+                password: 'weak',
+                role: 'user'
+            });
+
+        expect(response.status).toBe(400);
+    });
+});
