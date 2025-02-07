@@ -7,8 +7,8 @@
   "scripts": {
     "start": "node app.js",
     "dev": "nodemon app.js",
-    "test": "jest",
-    "test:watch": "jest --watch"
+    "test": "jest --coverage",
+    "test:watch": "jest --watch --coverage"
   },
   "keywords": [],
   "author": "",
@@ -19,7 +19,7 @@
     "fastify": "^3.29.0",
     "joi": "^17.13.3",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.9.5",
+    "mongoose": "^8.10.0",
     "nodemon": "^3.1.9"
   },
   "devDependencies": {

@@ -14,20 +14,13 @@ import app from '../app.js';
 
 console.log("Starting authopera.js...");
 
-const userRegisterSchema=joi.object({
-    username:joi.string().alphanum().min(3).max(15).required(),
-    email:joi.string().email().required(),
-    password:joi.string().pattern(new RegExp('^[a-zA-Z0-9]{3,30}$')).required(),
-    role:joi.string().valid('user', 'admin').required()
-
-}) ;
-
 
 
 // THE REGISTRATION CONTROLLER LOGIC 
 export const register=async(request,reply)=>{
     const {username,password,email,role}=request.body;
 
+    console.log(request.body)
 
     console.log("Registering user:", { username, email, role });  // Debugging the incoming request
  // Validate that all required fields are present
